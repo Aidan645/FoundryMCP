@@ -11,12 +11,14 @@ import {
   ArrowLeft,
   CheckCircle2
 } from 'lucide-react';
+import { BottomSheet } from './ui/BottomSheet';
 
 interface PartyStashViewProps {
   myActor: Actor | null;
   partyInventory: Actor | null;
   allActors: Actor[];
   onSendCommand: (action: string, params: Record<string, any>) => Promise<any>;
+  isMobile?: boolean;
 }
 
 export const PartyStashView: React.FC<PartyStashViewProps> = ({
@@ -24,7 +26,9 @@ export const PartyStashView: React.FC<PartyStashViewProps> = ({
   partyInventory,
   allActors,
   onSendCommand,
+  isMobile = false,
 }) => {
+  const [mobileTab, setMobileTab] = useState<'my' | 'party'>('my');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTargetActorId, setSelectedTargetActorId] = useState<string>('');
   const [transferringItemId, setTransferringItemId] = useState<string | null>(null);
@@ -153,10 +157,38 @@ export const PartyStashView: React.FC<PartyStashViewProps> = ({
         </div>
       )}
 
+      {/* Mobile Segmented Control */}
+      {isMobile && (
+        <div className="grid grid-cols-2 p-1 bg-slate-900 border border-slate-800 rounded-xl">
+          <button
+            onClick={() => setMobileTab('my')}
+            className={`py-2 text-xs font-bold rounded-lg transition ${
+              mobileTab === 'my'
+                ? 'bg-amber-500 text-slate-950 shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            My Backpack ({myItems.length})
+          </button>
+          <button
+            onClick={() => setMobileTab('party')}
+            className={`py-2 text-xs font-bold rounded-lg transition ${
+              mobileTab === 'party'
+                ? 'bg-amber-500 text-slate-950 shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Party Chest ({partyItems.length})
+          </button>
+        </div>
+      )}
+
       {/* Split Pane View */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Pane: My Backpack */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col h-[580px]">
+        <div className={`bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col h-[580px] ${
+          isMobile && mobileTab !== 'my' ? 'hidden' : 'flex'
+        }`}>
           <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -240,7 +272,9 @@ export const PartyStashView: React.FC<PartyStashViewProps> = ({
         </div>
 
         {/* Right Pane: Party Inventory */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col h-[580px]">
+        <div className={`bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col h-[580px] ${
+          isMobile && mobileTab !== 'party' ? 'hidden' : 'flex'
+        }`}>
           <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
@@ -341,107 +375,224 @@ export const PartyStashView: React.FC<PartyStashViewProps> = ({
 
       {/* Selected Item Transfer Control Modal / Dock */}
       {selectedItem && (
-        <div className="bg-slate-900 border-2 border-amber-500/40 rounded-xl p-4 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
-          <div className="flex items-center gap-3">
-            <img
-              src={selectedItem.item.img || '/icons/svg/item-bag.svg'}
-              alt={selectedItem.item.name}
-              className="w-12 h-12 rounded object-cover bg-slate-950 border border-amber-500/40"
-            />
-            <div>
-              <p className="text-xs text-amber-400 font-semibold uppercase tracking-wider">
-                Selected for Transfer:
-              </p>
-              <h4 className="text-base font-bold text-white">
-                {selectedItem.item.name}
-              </h4>
-              <p className="text-xs text-slate-400">
-                From: <span className="font-semibold text-slate-200">{selectedItem.sourceActorName}</span> (Available: {selectedItem.item.system?.quantity ?? 1})
-              </p>
+        isMobile ? (
+          <BottomSheet
+            isOpen={Boolean(selectedItem)}
+            onClose={() => setSelectedItem(null)}
+            title={`Transfer ${selectedItem.item.name}`}
+            subtitle={`From: ${selectedItem.sourceActorName} (Available: ${selectedItem.item.system?.quantity ?? 1})`}
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                <img
+                  src={selectedItem.item.img || '/icons/svg/item-bag.svg'}
+                  alt={selectedItem.item.name}
+                  className="w-12 h-12 rounded object-cover bg-slate-900 border border-amber-500/40"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-bold text-white block">{selectedItem.item.name}</span>
+                  <span className="text-xs text-slate-400 capitalize">{selectedItem.item.type}</span>
+                </div>
+              </div>
+
+              {/* Quantity Preset Stepper */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                  Quantity: <span className="text-amber-400 text-sm font-black">{transferQuantity}</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setTransferQuantity(Math.max(1, transferQuantity - 1))}
+                    className="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 text-lg font-bold text-white flex items-center justify-center active:scale-95 transition"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="range"
+                    min="1"
+                    max={selectedItem.item.system?.quantity ?? 1}
+                    value={transferQuantity}
+                    onChange={(e) => setTransferQuantity(Number(e.target.value))}
+                    className="flex-1 accent-amber-500"
+                  />
+                  <button
+                    onClick={() =>
+                      setTransferQuantity(
+                        Math.min(selectedItem.item.system?.quantity ?? 1, transferQuantity + 1)
+                      )
+                    }
+                    className="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 text-lg font-bold text-white flex items-center justify-center active:scale-95 transition"
+                  >
+                    +
+                  </button>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  {[1, 5, Math.ceil((selectedItem.item.system?.quantity ?? 1) / 2)].map(preset => (
+                    preset <= (selectedItem.item.system?.quantity ?? 1) ? (
+                      <button
+                        key={preset}
+                        onClick={() => setTransferQuantity(preset)}
+                        className="flex-1 py-1 bg-slate-800 hover:bg-slate-750 text-xs font-bold rounded-lg text-slate-300"
+                      >
+                        {preset}
+                      </button>
+                    ) : null
+                  ))}
+                  <button
+                    onClick={() => setTransferQuantity(selectedItem.item.system?.quantity ?? 1)}
+                    className="flex-1 py-1 bg-slate-800 hover:bg-slate-750 text-xs font-bold rounded-lg text-amber-400"
+                  >
+                    Max ({selectedItem.item.system?.quantity ?? 1})
+                  </button>
+                </div>
+              </div>
+
+              {/* Recipient Dropdown */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">
+                  Send To:
+                </label>
+                <select
+                  value={selectedTargetActorId}
+                  onChange={(e) => setSelectedTargetActorId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 text-sm font-semibold text-slate-100 rounded-xl p-3 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="">Choose Target Inventory...</option>
+                  {partyInventory && selectedItem.sourceActorId !== partyInventory.id && (
+                    <option value={partyInventory.id}>Party Inventory (Shared Chest)</option>
+                  )}
+                  {myActor && selectedItem.sourceActorId !== myActor.id && (
+                    <option value={myActor.id}>{myActor.name} (My Backpack)</option>
+                  )}
+                  {otherActors.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} (Player)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Confirm Transfer Button */}
+              <button
+                disabled={!selectedTargetActorId || Boolean(transferringItemId)}
+                onClick={() => {
+                  if (selectedTargetActorId) {
+                    handleQuickTransfer(
+                      selectedItem.item,
+                      selectedItem.sourceActorId,
+                      selectedTargetActorId,
+                      transferQuantity
+                    );
+                    setSelectedItem(null);
+                  }
+                }}
+                className="w-full h-12 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg transition disabled:opacity-40"
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+                <span>Confirm Transfer</span>
+              </button>
+            </div>
+          </BottomSheet>
+        ) : (
+          <div className="bg-slate-900 border-2 border-amber-500/40 rounded-xl p-4 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <img
+                src={selectedItem.item.img || '/icons/svg/item-bag.svg'}
+                alt={selectedItem.item.name}
+                className="w-12 h-12 rounded object-cover bg-slate-950 border border-amber-500/40"
+              />
+              <div>
+                <p className="text-xs text-amber-400 font-semibold uppercase tracking-wider">
+                  Selected for Transfer:
+                </p>
+                <h4 className="text-base font-bold text-white">
+                  {selectedItem.item.name}
+                </h4>
+                <p className="text-xs text-slate-400">
+                  From: <span className="font-semibold text-slate-200">{selectedItem.sourceActorName}</span> (Available: {selectedItem.item.system?.quantity ?? 1})
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                <span className="text-xs text-slate-400">Qty:</span>
+                <button
+                  onClick={() => setTransferQuantity(Math.max(1, transferQuantity - 1))}
+                  className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white flex items-center justify-center"
+                >
+                  -
+                </button>
+                <span className="text-xs font-mono font-bold text-amber-400 px-1">
+                  {transferQuantity}
+                </span>
+                <button
+                  onClick={() =>
+                    setTransferQuantity(
+                      Math.min(selectedItem.item.system?.quantity ?? 1, transferQuantity + 1)
+                    )
+                  }
+                  className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white flex items-center justify-center"
+                >
+                  +
+                </button>
+                <button
+                  onClick={() => setTransferQuantity(selectedItem.item.system?.quantity ?? 1)}
+                  className="text-[10px] text-slate-400 hover:text-white underline ml-1"
+                >
+                  Max
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">To:</span>
+                <select
+                  value={selectedTargetActorId}
+                  onChange={(e) => setSelectedTargetActorId(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="">Choose Target...</option>
+                  {partyInventory && selectedItem.sourceActorId !== partyInventory.id && (
+                    <option value={partyInventory.id}>Party Inventory (Shared Chest)</option>
+                  )}
+                  {myActor && selectedItem.sourceActorId !== myActor.id && (
+                    <option value={myActor.id}>{myActor.name} (My Backpack)</option>
+                  )}
+                  {otherActors.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} (Player)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                disabled={!selectedTargetActorId || Boolean(transferringItemId)}
+                onClick={() => {
+                  if (selectedTargetActorId) {
+                    handleQuickTransfer(
+                      selectedItem.item,
+                      selectedItem.sourceActorId,
+                      selectedTargetActorId,
+                      transferQuantity
+                    );
+                  }
+                }}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5 disabled:opacity-40"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5" />
+                <span>Transfer Now</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedItem(null)}
+                className="text-xs text-slate-400 hover:text-white px-2 py-1"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Quantity Selector */}
-            <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-              <span className="text-xs text-slate-400">Qty:</span>
-              <button
-                onClick={() => setTransferQuantity(Math.max(1, transferQuantity - 1))}
-                className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white flex items-center justify-center"
-              >
-                -
-              </button>
-              <span className="text-xs font-mono font-bold text-amber-400 px-1">
-                {transferQuantity}
-              </span>
-              <button
-                onClick={() =>
-                  setTransferQuantity(
-                    Math.min(selectedItem.item.system?.quantity ?? 1, transferQuantity + 1)
-                  )
-                }
-                className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white flex items-center justify-center"
-              >
-                +
-              </button>
-              <button
-                onClick={() => setTransferQuantity(selectedItem.item.system?.quantity ?? 1)}
-                className="text-[10px] text-slate-400 hover:text-white underline ml-1"
-              >
-                Max
-              </button>
-            </div>
-
-            {/* Recipient Selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">To:</span>
-              <select
-                value={selectedTargetActorId}
-                onChange={(e) => setSelectedTargetActorId(e.target.value)}
-                className="bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500"
-              >
-                <option value="">Choose Target...</option>
-                {partyInventory && selectedItem.sourceActorId !== partyInventory.id && (
-                  <option value={partyInventory.id}>Party Inventory (Shared Chest)</option>
-                )}
-                {myActor && selectedItem.sourceActorId !== myActor.id && (
-                  <option value={myActor.id}>{myActor.name} (My Backpack)</option>
-                )}
-                {otherActors.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} (Player)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Confirm Transfer Button */}
-            <button
-              disabled={!selectedTargetActorId || Boolean(transferringItemId)}
-              onClick={() => {
-                if (selectedTargetActorId) {
-                  handleQuickTransfer(
-                    selectedItem.item,
-                    selectedItem.sourceActorId,
-                    selectedTargetActorId,
-                    transferQuantity
-                  );
-                }
-              }}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition flex items-center gap-1.5 disabled:opacity-40"
-            >
-              <ArrowRightLeft className="w-3.5 h-3.5" />
-              <span>Transfer Now</span>
-            </button>
-
-            <button
-              onClick={() => setSelectedItem(null)}
-              className="text-xs text-slate-400 hover:text-white px-2 py-1"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        )
       )}
     </div>
   );

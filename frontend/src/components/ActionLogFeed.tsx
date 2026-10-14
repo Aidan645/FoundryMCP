@@ -17,6 +17,7 @@ interface ActionLogFeedProps {
   actors: Actor[];
   activeActor: Actor | null;
   onSendCommand: (action: string, params: Record<string, any>) => Promise<any>;
+  isMobile?: boolean;
 }
 
 export const ActionLogFeed: React.FC<ActionLogFeedProps> = ({
@@ -24,6 +25,7 @@ export const ActionLogFeed: React.FC<ActionLogFeedProps> = ({
   actors,
   activeActor,
   onSendCommand,
+  isMobile = false,
 }) => {
   const [filterMode, setFilterMode] = useState<'all' | 'rolls' | 'whispers'>('all');
   const [chatInput, setChatInput] = useState('');
@@ -237,17 +239,39 @@ export const ActionLogFeed: React.FC<ActionLogFeedProps> = ({
         )}
       </div>
 
+      {/* Quick Dice Roll Bar on Mobile & Desktop */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+        {['d4', 'd6', 'd8', 'd10', 'd12', 'd20', '2d6', '1d100'].map(die => (
+          <button
+            key={die}
+            type="button"
+            onClick={async () => {
+              if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate(10);
+              }
+              await onSendCommand('SEND_CHAT', {
+                content: `/roll 1${die}`,
+                speaker: activeActor?.name || 'Player',
+              });
+            }}
+            className="shrink-0 px-2.5 py-1 bg-slate-950 hover:bg-slate-800 active:scale-95 text-[11px] font-mono font-bold text-amber-400 rounded-lg border border-slate-800 transition"
+          >
+            {die}
+          </button>
+        ))}
+      </div>
+
       {/* Bottom Chat Bar */}
-      <form onSubmit={handleSendMessage} className="pt-3 border-t border-slate-800 mt-2">
+      <form onSubmit={handleSendMessage} className="pt-2 border-t border-slate-800">
         <div className="flex items-center gap-2">
           {/* Target Selector */}
           <select
             value={whisperTarget}
             onChange={(e) => setWhisperTarget(e.target.value)}
-            className="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-lg px-2 py-2 focus:outline-none focus:border-amber-500"
+            className="bg-slate-950 border border-slate-800 text-xs text-slate-300 rounded-lg px-2 py-2 focus:outline-none focus:border-amber-500 max-w-[110px] sm:max-w-none truncate"
           >
             <option value="public">To: Everyone</option>
-            <option value="gm">To: GM (Whisper)</option>
+            <option value="gm">To: GM</option>
             {actors.map(a => (
               <option key={a.id} value={a.name}>
                 To: {a.name}
@@ -260,8 +284,8 @@ export const ActionLogFeed: React.FC<ActionLogFeedProps> = ({
             type="text"
             placeholder={
               whisperTarget === 'public'
-                ? `Say something as ${activeActor?.name || 'Player'}...`
-                : `Whisper message to ${whisperTarget}...`
+                ? `Say something...`
+                : `Whisper to ${whisperTarget}...`
             }
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
@@ -272,7 +296,7 @@ export const ActionLogFeed: React.FC<ActionLogFeedProps> = ({
           <button
             type="submit"
             disabled={!chatInput.trim() || isSending}
-            className="bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs transition flex items-center gap-1.5"
+            className="bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold px-3 py-2 rounded-lg text-xs transition flex items-center gap-1"
           >
             <Send className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Send</span>

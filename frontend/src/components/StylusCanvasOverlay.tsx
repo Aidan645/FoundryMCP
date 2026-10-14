@@ -33,6 +33,7 @@ export interface StylusStroke {
 interface StylusCanvasOverlayProps {
   actorId: string;
   actorName: string;
+  isMobile?: boolean;
 }
 
 const PEN_COLORS = [
@@ -68,6 +69,7 @@ function getSvgPathFromStroke(stroke: number[][]): string {
 export const StylusCanvasOverlay: React.FC<StylusCanvasOverlayProps> = ({
   actorId,
   actorName,
+  isMobile = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -81,6 +83,8 @@ export const StylusCanvasOverlay: React.FC<StylusCanvasOverlayProps> = ({
   const [penSize, setPenSize] = useState<number>(4);
   const [palmRejection, setPalmRejection] = useState<boolean>(true);
   const [isOverlayVisible, setIsOverlayVisible] = useState<boolean>(true);
+  // On mobile, default drawing mode to false so touches scroll the sheet; activate via FAB
+  const [isDrawingActiveOnMobile, setIsDrawingActiveOnMobile] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'dirty'>('idle');
 
   // Load drawing strokes from backend on actor change
@@ -298,144 +302,168 @@ export const StylusCanvasOverlay: React.FC<StylusCanvasOverlayProps> = ({
     }
   };
 
+  const isInteractingWithCanvas = isMobile ? isDrawingActiveOnMobile : isOverlayVisible;
+
   return (
     <div className="relative w-full" ref={containerRef}>
-      {/* Floating Stylus Toolbar (Optimized for iPad & Android Tablet Touch Targets >= 44px) */}
-      <div className="sticky top-14 z-30 mb-2 flex flex-wrap items-center justify-between gap-2 bg-slate-900/95 backdrop-blur-md border border-slate-800 p-2 rounded-xl shadow-2xl">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Pen Tool Button */}
-          <button
-            onClick={() => setActiveTool('pen')}
-            className={`min-h-[42px] px-3 rounded-lg flex items-center gap-2 text-xs font-bold transition select-none ${
-              activeTool === 'pen'
-                ? 'bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-400/50'
-                : 'bg-slate-950 text-slate-300 hover:bg-slate-800'
-            }`}
-            title="Stylus / Pen"
-          >
-            <PenTool className="w-4 h-4" />
-            <span>Stylus</span>
-          </button>
+      {/* Floating Stylus Toolbar: Hidden on mobile unless isDrawingActiveOnMobile is true */}
+      {(!isMobile || isDrawingActiveOnMobile) && (
+        <div className="sticky top-14 z-30 mb-2 flex flex-wrap items-center justify-between gap-2 bg-slate-900/95 backdrop-blur-md border border-slate-800 p-2 rounded-xl shadow-2xl">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Pen Tool Button */}
+            <button
+              onClick={() => setActiveTool('pen')}
+              className={`min-h-[42px] px-3 rounded-lg flex items-center gap-2 text-xs font-bold transition select-none ${
+                activeTool === 'pen'
+                  ? 'bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-400/50'
+                  : 'bg-slate-950 text-slate-300 hover:bg-slate-800'
+              }`}
+              title="Stylus / Pen"
+            >
+              <PenTool className="w-4 h-4" />
+              <span>Stylus</span>
+            </button>
 
-          {/* Eraser Tool Button */}
-          <button
-            onClick={() => setActiveTool('eraser')}
-            className={`min-h-[42px] px-3 rounded-lg flex items-center gap-2 text-xs font-bold transition select-none ${
-              activeTool === 'eraser'
-                ? 'bg-rose-500 text-white shadow-md ring-2 ring-rose-400/50'
-                : 'bg-slate-950 text-slate-300 hover:bg-slate-800'
-            }`}
-            title="Eraser"
-          >
-            <Eraser className="w-4 h-4" />
-            <span>Eraser</span>
-          </button>
+            {/* Eraser Tool Button */}
+            <button
+              onClick={() => setActiveTool('eraser')}
+              className={`min-h-[42px] px-3 rounded-lg flex items-center gap-2 text-xs font-bold transition select-none ${
+                activeTool === 'eraser'
+                  ? 'bg-rose-500 text-white shadow-md ring-2 ring-rose-400/50'
+                  : 'bg-slate-950 text-slate-300 hover:bg-slate-800'
+              }`}
+              title="Eraser"
+            >
+              <Eraser className="w-4 h-4" />
+              <span>Eraser</span>
+            </button>
 
-          {/* Color Palette (Pen Only) */}
-          {activeTool === 'pen' && (
-            <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
-              {PEN_COLORS.map(c => (
+            {/* Color Palette (Pen Only) */}
+            {activeTool === 'pen' && (
+              <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
+                {PEN_COLORS.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setPenColor(c)}
+                    className={`w-7 h-7 rounded-full border-2 transition transform active:scale-90 ${
+                      penColor === c ? 'border-amber-400 scale-110 shadow-sm' : 'border-slate-700 hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: c }}
+                    title={`Color: ${c}`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Stroke Size Selector */}
+            <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-xs text-slate-400">
+              {PEN_SIZES.map(s => (
                 <button
-                  key={c}
-                  onClick={() => setPenColor(c)}
-                  className={`w-7 h-7 rounded-full border-2 transition transform active:scale-90 ${
-                    penColor === c ? 'border-amber-400 scale-110 shadow-sm' : 'border-slate-700 hover:scale-105'
+                  key={s.label}
+                  onClick={() => setPenSize(s.value)}
+                  className={`px-2 py-1 rounded font-medium transition ${
+                    penSize === s.value ? 'bg-slate-800 text-amber-400 font-bold' : 'hover:text-white'
                   }`}
-                  style={{ backgroundColor: c }}
-                  title={`Color: ${c}`}
-                />
+                >
+                  {s.label}
+                </button>
               ))}
             </div>
-          )}
 
-          {/* Stroke Size Selector */}
-          <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-xs text-slate-400">
-            {PEN_SIZES.map(s => (
+            {/* Palm Rejection Toggle */}
+            <button
+              onClick={() => setPalmRejection(!palmRejection)}
+              className={`min-h-[42px] px-2.5 rounded-lg flex items-center gap-1.5 text-xs font-medium border transition ${
+                palmRejection
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                  : 'bg-slate-950 text-slate-400 border-slate-800'
+              }`}
+              title="Palm Rejection: Ignores resting hands & finger touches, accepting only Pen/Stylus input"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Palm Guard {palmRejection ? 'ON' : 'OFF'}</span>
+            </button>
+          </div>
+
+          {/* Action Controls: Undo, Redo, Clear, Toggle Visibility */}
+          <div className="flex items-center gap-1.5 ml-auto">
+            <button
+              disabled={strokes.length === 0}
+              onClick={handleUndo}
+              className="w-10 h-10 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 disabled:opacity-40 flex items-center justify-center transition border border-slate-800"
+              title="Undo stroke"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+
+            <button
+              disabled={redoStack.length === 0}
+              onClick={handleRedo}
+              className="w-10 h-10 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 disabled:opacity-40 flex items-center justify-center transition border border-slate-800"
+              title="Redo stroke"
+            >
+              <RotateCw className="w-4 h-4" />
+            </button>
+
+            <button
+              disabled={strokes.length === 0}
+              onClick={handleClearAll}
+              className="w-10 h-10 rounded-lg bg-slate-950 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 disabled:opacity-40 flex items-center justify-center transition border border-slate-800"
+              title="Clear all ink"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => setIsOverlayVisible(!isOverlayVisible)}
+              className={`w-10 h-10 rounded-lg flex items-center justify-center transition border ${
+                isOverlayVisible
+                  ? 'bg-slate-950 text-amber-400 border-slate-800'
+                  : 'bg-slate-950 text-slate-600 border-slate-800'
+              }`}
+              title={isOverlayVisible ? 'Hide ink overlay' : 'Show ink overlay'}
+            >
+              {isOverlayVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            </button>
+
+            {isMobile && (
               <button
-                key={s.label}
-                onClick={() => setPenSize(s.value)}
-                className={`px-2 py-1 rounded font-medium transition ${
-                  penSize === s.value ? 'bg-slate-800 text-amber-400 font-bold' : 'hover:text-white'
-                }`}
+                onClick={() => setIsDrawingActiveOnMobile(false)}
+                className="px-3 h-10 rounded-lg bg-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center shadow-md ml-1"
               >
-                {s.label}
+                Done
               </button>
-            ))}
-          </div>
-
-          {/* Palm Rejection Toggle */}
-          <button
-            onClick={() => setPalmRejection(!palmRejection)}
-            className={`min-h-[42px] px-2.5 rounded-lg flex items-center gap-1.5 text-xs font-medium border transition ${
-              palmRejection
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                : 'bg-slate-950 text-slate-400 border-slate-800'
-            }`}
-            title="Palm Rejection: Ignores resting hands & finger touches, accepting only Pen/Stylus input"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Palm Guard {palmRejection ? 'ON' : 'OFF'}</span>
-          </button>
-        </div>
-
-        {/* Action Controls: Undo, Redo, Clear, Toggle Visibility */}
-        <div className="flex items-center gap-1.5 ml-auto">
-          <button
-            disabled={strokes.length === 0}
-            onClick={handleUndo}
-            className="w-10 h-10 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 disabled:opacity-40 flex items-center justify-center transition border border-slate-800"
-            title="Undo stroke"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-
-          <button
-            disabled={redoStack.length === 0}
-            onClick={handleRedo}
-            className="w-10 h-10 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 disabled:opacity-40 flex items-center justify-center transition border border-slate-800"
-            title="Redo stroke"
-          >
-            <RotateCw className="w-4 h-4" />
-          </button>
-
-          <button
-            disabled={strokes.length === 0}
-            onClick={handleClearAll}
-            className="w-10 h-10 rounded-lg bg-slate-950 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 disabled:opacity-40 flex items-center justify-center transition border border-slate-800"
-            title="Clear all ink"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => setIsOverlayVisible(!isOverlayVisible)}
-            className={`w-10 h-10 rounded-lg flex items-center justify-center transition border ${
-              isOverlayVisible
-                ? 'bg-slate-950 text-amber-400 border-slate-800'
-                : 'bg-slate-950 text-slate-600 border-slate-800'
-            }`}
-            title={isOverlayVisible ? 'Hide ink overlay' : 'Show ink overlay'}
-          >
-            {isOverlayVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-          </button>
-
-          {/* Sync indicator */}
-          <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1 ml-1">
-            {saveStatus === 'saved' && (
-              <span className="flex items-center gap-1 text-emerald-400" title="Handwriting synced to Hub DB">
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Synced</span>
-              </span>
             )}
-            {saveStatus === 'saving' && (
-              <span className="text-amber-400 animate-pulse">Saving...</span>
-            )}
-            {saveStatus === 'dirty' && (
-              <span className="text-slate-500">Unsaved</span>
-            )}
+
+            {/* Sync indicator */}
+            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1 ml-1">
+              {saveStatus === 'saved' && (
+                <span className="flex items-center gap-1 text-emerald-400" title="Handwriting synced to Hub DB">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Synced</span>
+                </span>
+              )}
+              {saveStatus === 'saving' && (
+                <span className="text-amber-400 animate-pulse">Saving...</span>
+              )}
+              {saveStatus === 'dirty' && (
+                <span className="text-slate-500">Unsaved</span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Mobile Floating Ink Action Button (FAB) */}
+      {isMobile && !isDrawingActiveOnMobile && (
+        <button
+          onClick={() => setIsDrawingActiveOnMobile(true)}
+          className="fixed bottom-20 right-4 z-40 w-12 h-12 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-2xl active:scale-95 transition"
+          title="Write / Draw Notes with Stylus"
+        >
+          <PenTool className="w-5 h-5" />
+        </button>
+      )}
 
       {/* Transparent Stylus Canvas Layer Mounted Directly Over Sheet */}
       <canvas
@@ -445,8 +473,8 @@ export const StylusCanvasOverlay: React.FC<StylusCanvasOverlayProps> = ({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className={`stylus-canvas absolute inset-0 z-20 w-full h-full cursor-crosshair transition-opacity duration-200 ${
-          isOverlayVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
+          isOverlayVisible ? 'opacity-100' : 'opacity-0'
+        } ${isInteractingWithCanvas ? 'pointer-events-auto' : 'pointer-events-none'}`}
         style={{
           touchAction: 'none',
         }}
