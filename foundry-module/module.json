@@ -1,0 +1,18 @@
+{
+  "id": "foundry-hub-bridge",
+  "title": "Foundry Tabletop Hub & MCP Bridge",
+  "description": "Bidirectional WebSocket bridge connecting Foundry VTT with the Tabletop Hub middleware and FastMCP server.",
+  "version": "1.0.0",
+  "authors": [
+    {
+      "name": "Foundry Tabletop Hub Team"
+    }
+  ],
+  "compatibility": {
+    "minimum": "12",
+    "verified": "14"
+  },
+  "esmodules": [
+    "bridge.js"
+  ]
+}
